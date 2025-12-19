@@ -2,52 +2,16 @@
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/FBXLoader.js"></script>
-      <script>
-        AFRAME.registerComponent('fbx-model', {
-          schema: { src: { type: 'selector' } },
-          init: function () {
-            const el = this.el;
-            const srcEl = this.data.src;
-            if (!srcEl) { console.warn('fbx-model: no src provided'); return; }
-            const url = srcEl.getAttribute('src');
-            const loader = new THREE.FBXLoader();
-            loader.load(url, function (object) {
-              object.traverse(function (child) {
-                if (child.isMesh) {
-                  child.castShadow = true;
-                  child.receiveShadow = true;
-                }
-              });
-              el.setObject3D('mesh', object);
-            }, undefined, function (err) { console.error('FBX load error:', err); });
-          },
-          remove: function () { this.el.removeObject3D('mesh'); }
-        });
-      </script>
-    </head>
-    <body>
-      <a-scene mindar-image="imageTargetSrc: targets1.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-        <a-assets>
-          <img id="card" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.jpg" />
-          <a-asset-item id="avatarModel" src="And.fbx"></a-asset-item>
-        </a-assets>
-
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-        <a-entity mindar-image-target="targetIndex: 0">
-          <a-plane src="#card" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
-          <a-entity fbx-model="src: #avatarModel" rotation="0 0 0" position="0 0 0.1" scale="0.01 0.01 0.01"
-            animation="property: position; to: 0 0.1 0.1; dur: 1000; easing: easeInOutQuad; loop: true; dir: alternate">
-          </a-entity>
-        </a-entity>
-      </a-scene>
-    </body>
-  </html>
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  </head>
+  <body>
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-plane color="blue" opaciy="0.5" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
