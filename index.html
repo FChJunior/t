@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>MindAR + Three.js + Animações</title>
+  <title>MindAR + Three.js + UI</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -30,46 +30,55 @@
     /* UI */
     #ui {
       position: fixed;
-      bottom: 16px;
+      bottom: 12px;
       left: 50%;
       transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      padding: 12px;
+      border-radius: 12px;
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 8px;
       z-index: 10;
+      color: #fff;
+      font-size: 12px;
     }
 
     #ui button {
-      padding: 10px 14px;
-      font-size: 13px;
+      padding: 6px;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       background: #222;
       color: #fff;
       cursor: pointer;
     }
 
-    #ui button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
+    #ui input[type="range"] {
+      width: 180px;
     }
   </style>
 </head>
 
 <body>
 
-<!-- 🎮 BOTÕES -->
+<!-- 🎮 UI -->
 <div id="ui">
+  <!-- Botões -->
   <button data-anim="Walking_A">Walk A</button>
   <button data-anim="Walking_B">Walk B</button>
-  <button data-anim="Walking_C">Walk C</button>
-
   <button data-anim="Running_A">Run A</button>
-  <button data-anim="Running_B">Run B</button>
-
   <button data-anim="Jump">Jump</button>
 
-  <button data-anim="T-Pose">T-Pose</button>
+  <!-- Sliders -->
+  <label>
+    Escala
+    <input id="scaleSlider" type="range" min="0.1" max="1.2" step="0.01" value="0.3">
+  </label>
+
+  <label>
+    Rotação Y
+    <input id="rotationSlider" type="range" min="-180" max="180" step="1" value="0">
+  </label>
 </div>
 
 <script type="module">
@@ -79,7 +88,6 @@
 
   async function start() {
 
-    // 🔹 MindAR
     const mindarThree = new MindARThree({
       container: document.body,
       imageTargetSrc: './targets.mind'
@@ -87,10 +95,8 @@
 
     const { renderer, scene, camera } = mindarThree;
 
-    // 🔹 Luz
     scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
 
-    // 🔹 Anchor
     const anchor = mindarThree.addAnchor(0);
 
     const loader = new GLTFLoader();
@@ -100,20 +106,21 @@
     let actions = {};
     let currentAction = null;
     let targetVisible = false;
+    let model = null;
 
     // ===============================
-    // 1️⃣ MODELO PRINCIPAL
+    // MODELO
     // ===============================
     loader.load('./character.glb', (gltf) => {
 
-      const model = gltf.scene;
+      model = gltf.scene;
       model.scale.set(0.3, 0.3, 0.3);
       anchor.group.add(model);
 
       mixer = new THREE.AnimationMixer(model);
 
       // ===============================
-      // 2️⃣ GLB DE ANIMAÇÕES
+      // ANIMAÇÕES
       // ===============================
       loader.load('./animations.glb', (animGltf) => {
 
@@ -121,27 +128,25 @@
           actions[clip.name] = mixer.clipAction(clip);
         });
 
-        console.log('Animações disponíveis:', Object.keys(actions));
+        console.log('Animações:', Object.keys(actions));
       });
     });
 
     // ===============================
-    // 🎯 TARGET
+    // TARGET
     // ===============================
     anchor.onTargetFound = () => {
       targetVisible = true;
-      setUI(true);
       playLoop("Walking_A");
     };
 
     anchor.onTargetLost = () => {
       targetVisible = false;
-      setUI(false);
       if (currentAction) currentAction.stop();
     };
 
     // ===============================
-    // ▶️ FUNÇÕES DE ANIMAÇÃO
+    // ANIMAÇÕES
     // ===============================
     function playLoop(name) {
       if (!targetVisible || !actions[name]) return;
@@ -166,19 +171,14 @@
       const land  = actions["Jump_Land"];
       const idle  = actions["Jump_Idle"];
 
-      if (!start || !full || !land || !idle) return;
-
       start.reset().setLoop(THREE.LoopOnce).play();
 
       mixer.addEventListener('finished', function onFinish(e) {
-
         if (e.action === start) {
           full.reset().setLoop(THREE.LoopOnce).play();
-        }
-        else if (e.action === full) {
+        } else if (e.action === full) {
           land.reset().setLoop(THREE.LoopOnce).play();
-        }
-        else if (e.action === land) {
+        } else if (e.action === land) {
           idle.reset().setLoop(THREE.LoopRepeat).play();
           currentAction = idle;
           mixer.removeEventListener('finished', onFinish);
@@ -189,28 +189,31 @@
     }
 
     // ===============================
-    // 🎮 UI
+    // UI EVENTS
     // ===============================
-    function setUI(enabled) {
-      document.querySelectorAll('#ui button')
-        .forEach(btn => btn.disabled = !enabled);
-    }
-
     document.querySelectorAll('#ui button').forEach(btn => {
       btn.addEventListener('click', () => {
-        const anim = btn.dataset.anim;
-
-        if (anim === "Jump") {
-          playJump();
-        }
-        else {
-          playLoop(anim);
-        }
+        if (btn.dataset.anim === "Jump") playJump();
+        else playLoop(btn.dataset.anim);
       });
     });
 
+    // 🎚 Slider Escala
+    document.getElementById('scaleSlider').addEventListener('input', (e) => {
+      if (!model) return;
+      const s = parseFloat(e.target.value);
+      model.scale.set(s, s, s);
+    });
+
+    // 🎚 Slider Rotação Y
+    document.getElementById('rotationSlider').addEventListener('input', (e) => {
+      if (!model) return;
+      const degrees = parseFloat(e.target.value);
+      model.rotation.y = THREE.MathUtils.degToRad(degrees);
+    });
+
     // ===============================
-    // 🚀 START
+    // START
     // ===============================
     await mindarThree.start();
 
