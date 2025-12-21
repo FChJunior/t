@@ -1,291 +1,260 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-<head>
-  <meta charset="UTF-8" />
-  <title>MindAR + Three.js + Raycaster</title>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MindAR + Three.js + UI Topo</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
 
-  <!-- IMPORT MAP -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
-    }
-  }
-  </script>
-
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: Arial, sans-serif;
-      touch-action: manipulation;
-    }
-
-    #ui {
-      position: fixed;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 6px;
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.65);
-      border-radius: 12px;
-      z-index: 10;
-    }
-
-    #ui button {
-      padding: 6px 10px;
-      border: none;
-      border-radius: 6px;
-      background: #222;
-      color: #fff;
-      font-size: 12px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-
-<body>
-
-<div id="ui">
-  <button data-anim="Walking_A">Walk</button>
-  <button data-anim="Running_A">Run</button>
-  <button data-anim="Jump">Jump</button>
-</div>
-
-<script type="module">
-  import * as THREE from 'three';
-  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-  import { MindARThree } from 'mindar-image-three';
-
-  document.body.style.position = "fixed";
-  document.body.style.width = "100%";
-
-  async function start() {
-
-    const mindarThree = new MindARThree({
-      container: document.body,
-      imageTargetSrc: './targets.mind'
-    });
-
-    const { renderer, scene, camera } = mindarThree;
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
-
-    const anchor = mindarThree.addAnchor(0);
-
-    const loader = new GLTFLoader();
-    const clock = new THREE.Clock();
-
-    let model = null;
-    let mixer;
-    let actions = {};
-    let currentAction = null;
-    let targetVisible = false;
-
-    // ===============================
-    // RAYCASTER
-    // ===============================
-    const raycaster = new THREE.Raycaster();
-    const touchPoint = new THREE.Vector2();
-    let touchingModel = false;
-
-    // ===============================
-    // MODELO
-    // ===============================
-    loader.load('./character.glb', (gltf) => {
-
-      model = gltf.scene;
-      model.position.set(0, 0.1, 0);
-      model.scale.set(0.3, 0.3, 0.3);
-      anchor.group.add(model);
-
-      mixer = new THREE.AnimationMixer(model);
-
-      loader.load('./animations.glb', (animGltf) => {
-        animGltf.animations.forEach((clip) => {
-          actions[clip.name] = mixer.clipAction(clip);
-        });
-        console.log('Animações:', Object.keys(actions));
-      });
-    });
-
-    // ===============================
-    // TARGET
-    // ===============================
-    anchor.onTargetFound = () => {
-      targetVisible = true;
-      playLoop("Walking_A");
-    };
-
-    anchor.onTargetLost = () => {
-      targetVisible = false;
-      touchingModel = false;
-      if (currentAction) currentAction.stop();
-    };
-
-    // ===============================
-    // ANIMAÇÕES
-    // ===============================
-    function playLoop(name) {
-      if (!targetVisible || !actions[name]) return;
-
-      if (currentAction) currentAction.fadeOut(0.25);
-
-      currentAction = actions[name];
-      currentAction
-        .reset()
-        .setLoop(THREE.LoopRepeat)
-        .fadeIn(0.25)
-        .play();
-    }
-
-    function playJump() {
-      if (!targetVisible) return;
-
-      if (currentAction) currentAction.fadeOut(0.2);
-
-      const start = actions["Jump_Start"];
-      const full  = actions["Jump_Full_Long"];
-      const land  = actions["Jump_Land"];
-      const idle  = actions["Jump_Idle"];
-
-      start.reset().setLoop(THREE.LoopOnce).play();
-
-      mixer.addEventListener('finished', function onFinish(e) {
-        if (e.action === start) {
-          full.reset().setLoop(THREE.LoopOnce).play();
-        } else if (e.action === full) {
-          land.reset().setLoop(THREE.LoopOnce).play();
-        } else if (e.action === land) {
-          idle.reset().setLoop(THREE.LoopRepeat).play();
-          currentAction = idle;
-          mixer.removeEventListener('finished', onFinish);
+    <!-- IMPORT MAP -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
         }
-      });
+      }
+    </script>
 
-      currentAction = start;
-    }
-
-    // ===============================
-    // UI
-    // ===============================
-    document.querySelectorAll('#ui button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (btn.dataset.anim === "Jump") playJump();
-        else playLoop(btn.dataset.anim);
-      });
-    });
-
-    // ===============================
-    // INTERAÇÃO COM RAYCASTER
-    // ===============================
-    const canvas = renderer.domElement;
-
-    let lastTouchX = null;
-    let initialPinchDistance = null;
-    let initialScale = 0.3;
-
-    canvas.addEventListener('touchstart', (e) => {
-      if (!targetVisible || !model) return;
-
-      updateRaycaster(e.touches[0]);
-
-      touchingModel = intersectsModel();
-
-      if (!touchingModel) return;
-
-      if (e.touches.length === 1) {
-        lastTouchX = e.touches[0].clientX;
+    <style>
+      /* 🔒 REMOVE SCROLL TOTAL */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        font-family: Arial, sans-serif;
+        background: #000;
       }
 
-      if (e.touches.length === 2) {
-        initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
-        initialScale = model.scale.x;
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-      if (!touchingModel || !model) return;
-
-      e.preventDefault();
-
-      // ROTACIONAR
-      if (e.touches.length === 1 && lastTouchX !== null) {
-        const currentX = e.touches[0].clientX;
-        const deltaX = currentX - lastTouchX;
-        lastTouchX = currentX;
-
-        model.rotation.y += deltaX * 0.01;
+      /* 🎮 UI FIXA NO TOPO */
+      #ui {
+        position: fixed;
+        bottom: 8px; /* ⬅️ agora fica embaixo */
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 12px;
+        z-index: 10;
+        max-width: 95vw;
+        justify-content: center;
+        box-sizing: border-box;
       }
 
-      // ESCALA
-      if (e.touches.length === 2 && initialPinchDistance) {
-        const currentDistance = getDistance(e.touches[0], e.touches[1]);
-        const scaleFactor = currentDistance / initialPinchDistance;
-
-        const newScale = THREE.MathUtils.clamp(
-          initialScale * scaleFactor,
-          0.15,
-          1.5
-        );
-
-        model.scale.set(newScale, newScale, newScale);
+      #ui button {
+        padding: 6px 10px;
+        border: none;
+        border-radius: 6px;
+        background: #222;
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
       }
-    }, { passive: false });
 
-    canvas.addEventListener('touchend', () => {
-      lastTouchX = null;
-      initialPinchDistance = null;
-      touchingModel = false;
-    });
+      #ui label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #fff;
+        white-space: nowrap;
+      }
 
-    // ===============================
-    // RAYCASTER HELPERS
-    // ===============================
-    function updateRaycaster(touch) {
-      const rect = canvas.getBoundingClientRect();
+      #ui input[type="range"] {
+        width: 110px;
+      }
+    </style>
+  </head>
 
-      touchPoint.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-      touchPoint.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+  <body>
+    <!-- 🎮 UI -->
+    <div id="ui">
+      <button data-anim="Walking_A">Walk A</button>
+      <button data-anim="Walking_B">Walk B</button>
+      <button data-anim="Running_A">Run</button>
+      <button data-anim="Jump">Jump</button>
 
-      raycaster.setFromCamera(touchPoint, camera);
-    }
+      <label>
+        Escala
+        <input
+          id="scaleSlider"
+          type="range"
+          min="0.1"
+          max="1.2"
+          step="0.01"
+          value="0.3"
+        />
+      </label>
 
-    function intersectsModel() {
-      const intersects = raycaster.intersectObject(model, true);
-      return intersects.length > 0;
-    }
+      <label>
+        Rotação Y
+        <input
+          id="rotationSlider"
+          type="range"
+          min="-180"
+          max="180"
+          step="1"
+          value="0"
+        />
+      </label>
+    </div>
 
-    function getDistance(t1, t2) {
-      const dx = t1.clientX - t2.clientX;
-      const dy = t1.clientY - t2.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { MindARThree } from "mindar-image-three";
 
-    // ===============================
-    // START
-    // ===============================
-    await mindarThree.start();
+      // 🔒 Fix extra contra scroll (Android)
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
 
-    renderer.setAnimationLoop(() => {
-      const delta = clock.getDelta();
-      if (mixer) mixer.update(delta);
-      renderer.render(scene, camera);
-    });
-  }
+      async function start() {
+        const mindarThree = new MindARThree({
+          container: document.body,
+          imageTargetSrc: "./targets.mind",
+        });
 
-  start();
-</script>
+        const { renderer, scene, camera } = mindarThree;
 
-</body>
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
+
+        const anchor = mindarThree.addAnchor(0);
+
+        const loader = new GLTFLoader();
+        const clock = new THREE.Clock();
+
+        let mixer;
+        let actions = {};
+        let currentAction = null;
+        let targetVisible = false;
+        let model = null;
+
+        // ===============================
+        // MODELO
+        // ===============================
+        loader.load("./character.glb", (gltf) => {
+          model = gltf.scene;
+          model.scale.set(0.3, 0.3, 0.3);
+          model.position.set(0, -0.3, 0);
+          anchor.group.add(model);
+
+          mixer = new THREE.AnimationMixer(model);
+
+          // ===============================
+          // ANIMAÇÕES
+          // ===============================
+          loader.load("./animations.glb", (animGltf) => {
+            animGltf.animations.forEach((clip) => {
+              actions[clip.name] = mixer.clipAction(clip);
+            });
+
+            console.log("Animações:", Object.keys(actions));
+          });
+        });
+
+        // ===============================
+        // TARGET
+        // ===============================
+        anchor.onTargetFound = () => {
+          targetVisible = true;
+          playLoop("Walking_A");
+        };
+
+        anchor.onTargetLost = () => {
+          targetVisible = false;
+          if (currentAction) currentAction.stop();
+        };
+
+        // ===============================
+        // ANIMAÇÕES
+        // ===============================
+        function playLoop(name) {
+          if (!targetVisible || !actions[name]) return;
+
+          if (currentAction) currentAction.fadeOut(0.25);
+
+          currentAction = actions[name];
+          currentAction.reset().setLoop(THREE.LoopRepeat).fadeIn(0.25).play();
+        }
+
+        function playJump() {
+          if (!targetVisible) return;
+
+          if (currentAction) currentAction.fadeOut(0.2);
+
+          const start = actions["Jump_Start"];
+          const full = actions["Jump_Full_Long"];
+          const land = actions["Jump_Land"];
+          const idle = actions["Jump_Idle"];
+
+          start.reset().setLoop(THREE.LoopOnce).play();
+
+          mixer.addEventListener("finished", function onFinish(e) {
+            if (e.action === start) {
+              full.reset().setLoop(THREE.LoopOnce).play();
+            } else if (e.action === full) {
+              land.reset().setLoop(THREE.LoopOnce).play();
+            } else if (e.action === land) {
+              idle.reset().setLoop(THREE.LoopRepeat).play();
+              currentAction = idle;
+              mixer.removeEventListener("finished", onFinish);
+            }
+          });
+
+          currentAction = start;
+        }
+
+        // ===============================
+        // UI EVENTS
+        // ===============================
+        document.querySelectorAll("#ui button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (btn.dataset.anim === "Jump") playJump();
+            else playLoop(btn.dataset.anim);
+          });
+        });
+
+        // 🎚 Escala
+        document
+          .getElementById("scaleSlider")
+          .addEventListener("input", (e) => {
+            if (!model) return;
+            const s = parseFloat(e.target.value);
+            model.scale.set(s, s, s);
+          });
+
+        // 🎚 Rotação Y
+        document
+          .getElementById("rotationSlider")
+          .addEventListener("input", (e) => {
+            if (!model) return;
+            model.rotation.y = THREE.MathUtils.degToRad(e.target.value);
+          });
+
+        // ===============================
+        // START
+        // ===============================
+        await mindarThree.start();
+
+        renderer.setAnimationLoop(() => {
+          const delta = clock.getDelta();
+          if (mixer) mixer.update(delta);
+          renderer.render(scene, camera);
+        });
+      }
+
+      start();
+    </script>
+  </body>
 </html>
