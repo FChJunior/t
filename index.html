@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>MindAR + Three.js Interação Direta</title>
+  <title>MindAR + Three.js + Raycaster</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
@@ -26,10 +26,9 @@
       overflow: hidden;
       background: #000;
       font-family: Arial, sans-serif;
-      touch-action: manipulation; /* 🔥 correto para WebAR */
+      touch-action: manipulation;
     }
 
-    /* UI */
     #ui {
       position: fixed;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
@@ -57,7 +56,6 @@
 
 <body>
 
-<!-- 🎮 UI -->
 <div id="ui">
   <button data-anim="Walking_A">Walk</button>
   <button data-anim="Running_A">Run</button>
@@ -95,6 +93,13 @@
     let targetVisible = false;
 
     // ===============================
+    // RAYCASTER
+    // ===============================
+    const raycaster = new THREE.Raycaster();
+    const touchPoint = new THREE.Vector2();
+    let touchingModel = false;
+
+    // ===============================
     // MODELO
     // ===============================
     loader.load('./character.glb', (gltf) => {
@@ -124,6 +129,7 @@
 
     anchor.onTargetLost = () => {
       targetVisible = false;
+      touchingModel = false;
       if (currentAction) currentAction.stop();
     };
 
@@ -181,7 +187,7 @@
     });
 
     // ===============================
-    // INTERAÇÃO DIRETA (TOQUE)
+    // INTERAÇÃO COM RAYCASTER
     // ===============================
     const canvas = renderer.domElement;
 
@@ -191,6 +197,12 @@
 
     canvas.addEventListener('touchstart', (e) => {
       if (!targetVisible || !model) return;
+
+      updateRaycaster(e.touches[0]);
+
+      touchingModel = intersectsModel();
+
+      if (!touchingModel) return;
 
       if (e.touches.length === 1) {
         lastTouchX = e.touches[0].clientX;
@@ -203,11 +215,11 @@
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
-      if (!targetVisible || !model) return;
+      if (!touchingModel || !model) return;
 
-      e.preventDefault(); // 🔥 ESSENCIAL
+      e.preventDefault();
 
-      // ROTACIONAR (1 dedo)
+      // ROTACIONAR
       if (e.touches.length === 1 && lastTouchX !== null) {
         const currentX = e.touches[0].clientX;
         const deltaX = currentX - lastTouchX;
@@ -216,7 +228,7 @@
         model.rotation.y += deltaX * 0.01;
       }
 
-      // ESCALA (2 dedos)
+      // ESCALA
       if (e.touches.length === 2 && initialPinchDistance) {
         const currentDistance = getDistance(e.touches[0], e.touches[1]);
         const scaleFactor = currentDistance / initialPinchDistance;
@@ -234,7 +246,25 @@
     canvas.addEventListener('touchend', () => {
       lastTouchX = null;
       initialPinchDistance = null;
+      touchingModel = false;
     });
+
+    // ===============================
+    // RAYCASTER HELPERS
+    // ===============================
+    function updateRaycaster(touch) {
+      const rect = canvas.getBoundingClientRect();
+
+      touchPoint.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+      touchPoint.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(touchPoint, camera);
+    }
+
+    function intersectsModel() {
+      const intersects = raycaster.intersectObject(model, true);
+      return intersects.length > 0;
+    }
 
     function getDistance(t1, t2) {
       const dx = t1.clientX - t2.clientX;
