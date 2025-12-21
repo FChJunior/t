@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>MindAR + Three.js Interativo</title>
+  <title>MindAR + Three.js Interação Direta</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
@@ -24,12 +24,12 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      touch-action: none;
       background: #000;
       font-family: Arial, sans-serif;
+      touch-action: manipulation; /* 🔥 correto para WebAR */
     }
 
-    /* UI mínima (botões de animação) */
+    /* UI */
     #ui {
       position: fixed;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
@@ -95,21 +95,13 @@
     let targetVisible = false;
 
     // ===============================
-    // INTERAÇÃO
-    // ===============================
-    let isDragging = false;
-    let previousX = 0;
-    let initialPinchDistance = null;
-    let initialScale = 0.3;
-
-    // ===============================
     // MODELO
     // ===============================
     loader.load('./character.glb', (gltf) => {
 
       model = gltf.scene;
       model.position.set(0, 0.1, 0);
-      model.scale.set(initialScale, initialScale, initialScale);
+      model.scale.set(0.3, 0.3, 0.3);
       anchor.group.add(model);
 
       mixer = new THREE.AnimationMixer(model);
@@ -118,7 +110,6 @@
         animGltf.animations.forEach((clip) => {
           actions[clip.name] = mixer.clipAction(clip);
         });
-
         console.log('Animações:', Object.keys(actions));
       });
     });
@@ -190,39 +181,42 @@
     });
 
     // ===============================
-    // INTERAÇÃO DIRETA
+    // INTERAÇÃO DIRETA (TOQUE)
     // ===============================
     const canvas = renderer.domElement;
 
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!targetVisible || !model) return;
-      isDragging = true;
-      previousX = e.clientX;
-    });
+    let lastTouchX = null;
+    let initialPinchDistance = null;
+    let initialScale = 0.3;
 
-    canvas.addEventListener('pointermove', (e) => {
-      if (!isDragging || !model) return;
-      const deltaX = e.clientX - previousX;
-      previousX = e.clientX;
-      model.rotation.y += deltaX * 0.01;
-    });
-
-    canvas.addEventListener('pointerup', () => isDragging = false);
-    canvas.addEventListener('pointerleave', () => isDragging = false);
-
-    // 🤏 PINÇA
     canvas.addEventListener('touchstart', (e) => {
       if (!targetVisible || !model) return;
+
+      if (e.touches.length === 1) {
+        lastTouchX = e.touches[0].clientX;
+      }
 
       if (e.touches.length === 2) {
         initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
         initialScale = model.scale.x;
       }
-    });
+    }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
       if (!targetVisible || !model) return;
 
+      e.preventDefault(); // 🔥 ESSENCIAL
+
+      // ROTACIONAR (1 dedo)
+      if (e.touches.length === 1 && lastTouchX !== null) {
+        const currentX = e.touches[0].clientX;
+        const deltaX = currentX - lastTouchX;
+        lastTouchX = currentX;
+
+        model.rotation.y += deltaX * 0.01;
+      }
+
+      // ESCALA (2 dedos)
       if (e.touches.length === 2 && initialPinchDistance) {
         const currentDistance = getDistance(e.touches[0], e.touches[1]);
         const scaleFactor = currentDistance / initialPinchDistance;
@@ -235,9 +229,10 @@
 
         model.scale.set(newScale, newScale, newScale);
       }
-    });
+    }, { passive: false });
 
     canvas.addEventListener('touchend', () => {
+      lastTouchX = null;
       initialPinchDistance = null;
     });
 
