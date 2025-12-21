@@ -1,69 +1,227 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>MindAR + Three.js Básico</title>
+  <title>MindAR + Three.js + Animações</title>
 
-  <!-- THREE.JS -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- GLTF LOADER -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
-
-  <!-- MINDAR -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+  <!-- IMPORT MAP -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
 
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       overflow: hidden;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    /* UI */
+    #ui {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    #ui button {
+      padding: 10px 14px;
+      font-size: 13px;
+      border: none;
+      border-radius: 8px;
+      background: #222;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #ui button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
   </style>
 </head>
 
 <body>
 
-<script>
-async function start() {
+<!-- 🎮 BOTÕES -->
+<div id="ui">
+  <button data-anim="Walking_A">Walk A</button>
+  <button data-anim="Walking_B">Walk B</button>
+  <button data-anim="Walking_C">Walk C</button>
 
-  // 1️⃣ Inicializa o MindAR
-  const mindarThree = new window.MINDAR.IMAGE.MindARThree({
-    container: document.body,
-    imageTargetSrc: './targets.mind',
-  });
+  <button data-anim="Running_A">Run A</button>
+  <button data-anim="Running_B">Run B</button>
 
-  const { renderer, scene, camera } = mindarThree;
+  <button data-anim="Jump">Jump</button>
 
-  // 2️⃣ Luz simples
-  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-  scene.add(light);
+  <button data-anim="T-Pose">T-Pose</button>
+</div>
 
-  // 3️⃣ Anchor ligado ao target 0
-  const anchor = mindarThree.addAnchor(0);
+<script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MindARThree } from 'mindar-image-three';
 
-  // 4️⃣ Carrega o modelo 3D
-  const loader = new THREE.GLTFLoader();
-  loader.load('./Barbarian.glb', (gltf) => {
-    const model = gltf.scene;
+  async function start() {
 
-    model.scale.set(0.3, 0.3, 0.3);
-    model.position.set(0, 0, 0);
+    // 🔹 MindAR
+    const mindarThree = new MindARThree({
+      container: document.body,
+      imageTargetSrc: './targets.mind'
+    });
 
-    // Adiciona o modelo ao anchor
-    anchor.group.add(model);
-  });
+    const { renderer, scene, camera } = mindarThree;
 
-  // 5️⃣ Inicia o AR
-  await mindarThree.start();
+    // 🔹 Luz
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
 
-  // 6️⃣ Render loop
-  renderer.setAnimationLoop(() => {
-    renderer.render(scene, camera);
-  });
-}
+    // 🔹 Anchor
+    const anchor = mindarThree.addAnchor(0);
 
-// Inicia
-start();
+    const loader = new GLTFLoader();
+    const clock = new THREE.Clock();
+
+    let mixer;
+    let actions = {};
+    let currentAction = null;
+    let targetVisible = false;
+
+    // ===============================
+    // 1️⃣ MODELO PRINCIPAL
+    // ===============================
+    loader.load('./character.glb', (gltf) => {
+
+      const model = gltf.scene;
+      model.scale.set(0.3, 0.3, 0.3);
+      anchor.group.add(model);
+
+      mixer = new THREE.AnimationMixer(model);
+
+      // ===============================
+      // 2️⃣ GLB DE ANIMAÇÕES
+      // ===============================
+      loader.load('./animations.glb', (animGltf) => {
+
+        animGltf.animations.forEach((clip) => {
+          actions[clip.name] = mixer.clipAction(clip);
+        });
+
+        console.log('Animações disponíveis:', Object.keys(actions));
+      });
+    });
+
+    // ===============================
+    // 🎯 TARGET
+    // ===============================
+    anchor.onTargetFound = () => {
+      targetVisible = true;
+      setUI(true);
+      playLoop("Walking_A");
+    };
+
+    anchor.onTargetLost = () => {
+      targetVisible = false;
+      setUI(false);
+      if (currentAction) currentAction.stop();
+    };
+
+    // ===============================
+    // ▶️ FUNÇÕES DE ANIMAÇÃO
+    // ===============================
+    function playLoop(name) {
+      if (!targetVisible || !actions[name]) return;
+
+      if (currentAction) currentAction.fadeOut(0.25);
+
+      currentAction = actions[name];
+      currentAction
+        .reset()
+        .setLoop(THREE.LoopRepeat)
+        .fadeIn(0.25)
+        .play();
+    }
+
+    function playJump() {
+      if (!targetVisible) return;
+
+      if (currentAction) currentAction.fadeOut(0.2);
+
+      const start = actions["Jump_Start"];
+      const full  = actions["Jump_Full_Long"];
+      const land  = actions["Jump_Land"];
+      const idle  = actions["Jump_Idle"];
+
+      if (!start || !full || !land || !idle) return;
+
+      start.reset().setLoop(THREE.LoopOnce).play();
+
+      mixer.addEventListener('finished', function onFinish(e) {
+
+        if (e.action === start) {
+          full.reset().setLoop(THREE.LoopOnce).play();
+        }
+        else if (e.action === full) {
+          land.reset().setLoop(THREE.LoopOnce).play();
+        }
+        else if (e.action === land) {
+          idle.reset().setLoop(THREE.LoopRepeat).play();
+          currentAction = idle;
+          mixer.removeEventListener('finished', onFinish);
+        }
+      });
+
+      currentAction = start;
+    }
+
+    // ===============================
+    // 🎮 UI
+    // ===============================
+    function setUI(enabled) {
+      document.querySelectorAll('#ui button')
+        .forEach(btn => btn.disabled = !enabled);
+    }
+
+    document.querySelectorAll('#ui button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const anim = btn.dataset.anim;
+
+        if (anim === "Jump") {
+          playJump();
+        }
+        else {
+          playLoop(anim);
+        }
+      });
+    });
+
+    // ===============================
+    // 🚀 START
+    // ===============================
+    await mindarThree.start();
+
+    renderer.setAnimationLoop(() => {
+      const delta = clock.getDelta();
+      if (mixer) mixer.update(delta);
+      renderer.render(scene, camera);
+    });
+  }
+
+  start();
 </script>
 
 </body>
