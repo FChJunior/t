@@ -1,21 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>MindAR + Three.js Básico</title>
 
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  </head>
-  <body>
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-      <a-assets>
-        <img id="card" src="Hornet.jpg" />
-        <a-asset-item id="avatarModel" src="Barbarian.glb"></a-asset-item>
-      </a-assets>
+  <!-- THREE.JS -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-gltf-model rotation="0 0 0 " position="0 0 0.1" scale="0.5 0.5 0.5" src="#avatarModel" animation="property: position; to: 0 0.1 0.1; dur: 1000; easing: easeInOutQuad; loop: true; dir: alternate">
-      </a-entity>
-    </a-scene>
-  </body>
+  <!-- GLTF LOADER -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+
+  <!-- MINDAR -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+
+<script>
+async function start() {
+
+  // 1️⃣ Inicializa o MindAR
+  const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+    container: document.body,
+    imageTargetSrc: './targets.mind',
+  });
+
+  const { renderer, scene, camera } = mindarThree;
+
+  // 2️⃣ Luz simples
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  scene.add(light);
+
+  // 3️⃣ Anchor ligado ao target 0
+  const anchor = mindarThree.addAnchor(0);
+
+  // 4️⃣ Carrega o modelo 3D
+  const loader = new THREE.GLTFLoader();
+  loader.load('./Barbarian.glb', (gltf) => {
+    const model = gltf.scene;
+
+    model.scale.set(0.3, 0.3, 0.3);
+    model.position.set(0, 0, 0);
+
+    // Adiciona o modelo ao anchor
+    anchor.group.add(model);
+  });
+
+  // 5️⃣ Inicia o AR
+  await mindarThree.start();
+
+  // 6️⃣ Render loop
+  renderer.setAnimationLoop(() => {
+    renderer.render(scene, camera);
+  });
+}
+
+// Inicia
+start();
+</script>
+
+</body>
 </html>
